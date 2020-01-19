@@ -193,12 +193,9 @@ uint32_t ADS124S08::SPI_Read_32(uint16_t Address)
 	SPI.transfer16(temp_address);
 	temp_highpacket = SPI.transfer16(0);
 	temp_lowpacket = SPI.transfer16(0);
-
 	digitalWrite(_chipSelect_Pin, HIGH);
-
 	returnData = temp_highpacket << 16;
 	returnData = returnData + temp_lowpacket;
-
 	return returnData;
 }
 
@@ -210,12 +207,11 @@ void ADS124S08::begin()
 	SPI.begin();
 	SPI.setBitOrder(MSBFIRST);
 	SPI.setDataMode(SPI_MODE1);
-// SPI.setClockSpeed( 1000000 );
-//SPI.beginTransaction(SPISettings(1000000,MSBFIRST,SPI_MODE0));
-#if defined(SPI_HAS_TRANSACTION)
+	// SPI.setClockSpeed( 1000000 );
+	// SPI.beginTransaction(SPISettings(1000000,MSBFIRST,SPI_MODE0));
+	#if defined(SPI_HAS_TRANSACTION)
 	mySPISettings = SPISettings(1000000, MSBFIRST, SPI_MODE1);
-#endif
-
+	#endif
 	assertStart();
 	printf("ADS124S08 begin...\r\n");
 }
@@ -235,19 +231,18 @@ char ADS124S08::regRead(unsigned int regnum)
 	ulDataTx[1] = 0x00;
 	ulDataTx[2] = 0x00;
 	selectDeviceCSLow();
-
-#if defined(SPI_HAS_TRANSACTION)
+	#if defined(SPI_HAS_TRANSACTION)
 	SPI.beginTransaction(mySPISettings);
-#endif
+	#endif
 
 	for (i = 0; i < 3; i++)
 		ulDataRx[i] = SPI.transfer(ulDataTx[i]);
 	if (regnum < NUM_REGISTERS)
 		registers[regnum] = ulDataRx[2];
 
-#if defined(SPI_HAS_TRANSACTION)
+	#if defined(SPI_HAS_TRANSACTION)
 	SPI.endTransaction();
-#endif
+	#endif
 
 	releaseChipSelect();
 	//Serial.printlnf("regRead tx: %02x %02x %02x",ulDataTx[0],ulDataTx[1],ulDataTx[2]);
@@ -270,9 +265,9 @@ void ADS124S08::readRegs(unsigned int regnum, unsigned int count, uint8_t *data)
 	ulDataTx[0] = REGRD_OPCODE_MASK + (regnum & 0x1f);
 	ulDataTx[1] = count - 1;
 	selectDeviceCSLow();
-#if defined(SPI_HAS_TRANSACTION)
+	#if defined(SPI_HAS_TRANSACTION)
 	SPI.beginTransaction(mySPISettings);
-#endif
+	#endif
 
 	SPI.transfer(ulDataTx[0]);
 	SPI.transfer(ulDataTx[1]);
@@ -282,9 +277,9 @@ void ADS124S08::readRegs(unsigned int regnum, unsigned int count, uint8_t *data)
 		if (regnum + i < NUM_REGISTERS)
 			registers[regnum + i] = data[i];
 	}
-#if defined(SPI_HAS_TRANSACTION)
+	#if defined(SPI_HAS_TRANSACTION)
 	SPI.endTransaction();
-#endif
+	#endif
 	releaseChipSelect();
 }
 
@@ -302,9 +297,15 @@ void ADS124S08::regWrite(unsigned int regnum, unsigned char data)
 	ulDataTx[1] = 0x00;
 	ulDataTx[2] = data;
 	selectDeviceCSLow();
+	#if defined(SPI_HAS_TRANSACTION)
+	SPI.beginTransaction(mySPISettings);
+	#endif
 	SPI.transfer(ulDataTx[0]);
 	SPI.transfer(ulDataTx[1]);
 	SPI.transfer(ulDataTx[2]);
+	#if defined(SPI_HAS_TRANSACTION)
+	SPI.endTransaction();
+	#endif
 	releaseChipSelect();
 	printf("regWrite tx: %02x %02x %02x\r\n", ulDataTx[0], ulDataTx[1], ulDataTx[2]);
 	return;
@@ -325,6 +326,9 @@ void ADS124S08::writeRegs(unsigned int regnum, unsigned int howmuch, unsigned ch
 	ulDataTx[0] = REGWR_OPCODE_MASK + (regnum & 0x1f);
 	ulDataTx[1] = howmuch - 1;
 	selectDeviceCSLow();
+	#if defined(SPI_HAS_TRANSACTION)
+	SPI.beginTransaction(mySPISettings);
+	#endif
 	SPI.transfer(ulDataTx[0]);
 	SPI.transfer(ulDataTx[1]);
 	for (i = 0; i < howmuch; i++)
@@ -333,6 +337,9 @@ void ADS124S08::writeRegs(unsigned int regnum, unsigned int howmuch, unsigned ch
 		if (regnum + i < NUM_REGISTERS)
 			registers[regnum + i] = data[i];
 	}
+	#if defined(SPI_HAS_TRANSACTION)
+	SPI.endTransaction();
+	#endif
 	releaseChipSelect();
 	return;
 }
@@ -347,7 +354,13 @@ void ADS124S08::sendCommand(uint8_t op_code)
 {
 	printf("Send command %x\r\n", op_code);
 	selectDeviceCSLow();
+	#if defined(SPI_HAS_TRANSACTION)
+	SPI.beginTransaction(mySPISettings);
+	#endif
 	SPI.transfer(op_code);
+	#if defined(SPI_HAS_TRANSACTION)
+	SPI.endTransaction();
+	#endif
 	releaseChipSelect();
 	return;
 }
@@ -405,6 +418,9 @@ int ADS124S08::rData(uint8_t *dStatus, uint8_t *dData, uint8_t *dCRC)
 {
 	int result = -1;
 	selectDeviceCSLow();
+    #if defined(SPI_HAS_TRANSACTION)
+	SPI.beginTransaction(mySPISettings);
+    #endif
 
 	// according to datasheet chapter 9.5.4.2 Read Data by RDATA Command
 	sendCommand(RDATA_OPCODE_MASK);
@@ -434,7 +450,9 @@ int ADS124S08::rData(uint8_t *dStatus, uint8_t *dData, uint8_t *dCRC)
 	{
 		dCRC[0] = SPI.transfer(0x00);
 	}
-
+	#if defined(SPI_HAS_TRANSACTION)
+	SPI.endTransaction();
+	#endif
 	releaseChipSelect();
 	return result;
 }
@@ -451,9 +469,9 @@ int ADS124S08::dataRead(uint8_t *dStatus, uint8_t *dData, uint8_t *dCRC)
 	uint8_t xstatus;
 	int iData;
 	selectDeviceCSLow();
-#if defined(SPI_HAS_TRANSACTION)
+	#if defined(SPI_HAS_TRANSACTION)
 	SPI.beginTransaction(mySPISettings);
-#endif
+	#endif
 	if ((registers[SYS_ADDR_MASK] & 0x01) == DATA_MODE_STATUS)
 	{
 		xstatus = SPI.transfer(0x00);
@@ -484,9 +502,9 @@ int ADS124S08::dataRead(uint8_t *dStatus, uint8_t *dData, uint8_t *dCRC)
 		xcrc = SPI.transfer(0x00);
 		dCRC[0] = (uint8_t)xcrc;
 	}
-#if defined(SPI_HAS_TRANSACTION)
+	#if defined(SPI_HAS_TRANSACTION)
 	SPI.endTransaction();
-#endif
+	#endif
 	releaseChipSelect();
 	return iData;
 }
